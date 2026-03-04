@@ -198,7 +198,29 @@ def constraint_solver(board, flags_left):
                             changed = True
 
         constraints.extend(new_constraints)
+    # ===============================
+    # Global disjoint region reasoning
+    # ===============================
 
+    # Tìm tập các constraint không chồng lấn
+    disjoint_sets = []
+    used_cells = set()
+    total_bombs = 0
+
+    for c in constraints:
+        if not c["cells"].intersection(used_cells):
+            disjoint_sets.append(c)
+            used_cells.update(c["cells"])
+            total_bombs += c["bombs"]
+
+    # Nếu tổng bomb của các vùng = flags_left
+    if total_bombs == flags_left and total_bombs > 0:
+
+        # Các ô chưa mở còn lại ngoài used_cells đều an toàn
+        for r in range(rows):
+            for c in range(cols):
+                if board[r][c] is None and (r, c) not in used_cells:
+                    return ("reveal", r, c)
     return ("none", -1, -1)
 
 def probability_solver(board, flags_left):
