@@ -156,20 +156,47 @@ async function loadState() {
 }
 
 function renderBoard(board) {
-
     const boardDiv = document.getElementById("board");
-    boardDiv.innerHTML = "";
-
     const size = board.length;
     const maxWidth = boardDiv.clientWidth;
-    const cellSize = Math.floor(maxWidth*0.8 / size);
+    const cellSize = Math.floor(maxWidth * 0.8 / size);
 
-    boardDiv.style.gridTemplateColumns =
-        `repeat(${size}, ${cellSize}px)`;
+    // Nếu bảng đã được tạo đúng kích thước, thì chỉ cập nhật nội dung thay vì xóa toàn bộ
+    if (boardDiv.childElementCount === size * size) {
+        board.forEach((row, r) => {
+            row.forEach((cell, c) => {
+                const idx = r * size + c;
+                const div = boardDiv.children[idx];
+
+                // Reset trạng thái class và sự kiện
+                div.className = "cell";
+                div.innerText = "";
+                div.onclick = null;
+                div.oncontextmenu = null;
+
+                if (cell === null) {
+                    div.onclick = () => reveal(r, c);
+                    div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
+                } else if (cell === "F") {
+                    div.classList.add("flag");
+                    div.innerText = "🚩";
+                    // Cho phép click chuột phải để hủy cờ
+                    div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); }; 
+                } else {
+                    div.classList.add("revealed");
+                    if (cell !== 0) div.innerText = cell;
+                }
+            });
+        });
+        return;
+    }
+
+    // Tạo bảng mới hoàn toàn (chỉ chạy khi load lần đầu hoặc đổi Size)
+    boardDiv.innerHTML = "";
+    boardDiv.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
 
     board.forEach((row, r) => {
         row.forEach((cell, c) => {
-
             const div = document.createElement("div");
             div.classList.add("cell");
 
@@ -179,19 +206,16 @@ function renderBoard(board) {
 
             if (cell === null) {
                 div.onclick = () => reveal(r, c);
-                div.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    flag(r, c);
-                };
+                div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
             }
             else if (cell === "F") {
                 div.classList.add("flag");
                 div.innerText = "🚩";
+                div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
             }
             else {
                 div.classList.add("revealed");
-                if (cell !== 0)
-                    div.innerText = cell;
+                if (cell !== 0) div.innerText = cell;
             }
 
             boardDiv.appendChild(div);
