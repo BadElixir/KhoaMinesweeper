@@ -41,7 +41,7 @@ class NewGameRequest(BaseModel):
 
 class BoardTile:
     def __init__(self):
-        self.bomb_count = 0
+        self.adjacent_bombs = 0
         self.revealed = False
         self.has_bomb = False
         self.flagged = False
@@ -93,7 +93,7 @@ class Game:
             for dy, dx in DELTA_PAIRS:
                 ny, nx = y_bomb + dy, x_bomb + dx
                 if self.coords_valid(ny, nx):
-                    self.board[ny][nx].bomb_count += 1
+                    self.board[ny][nx].adjacent_bombs += 1
 
 
     def reveal_safe_area(self, row, col):
@@ -109,7 +109,7 @@ class Game:
             tile.revealed = True
             self.revealed_tiles += 1
 
-            if tile.bomb_count > 0:
+            if tile.adjacent_bombs > 0:
                 continue
 
             for dy, dx in DELTA_PAIRS:
@@ -178,7 +178,7 @@ class Game:
             row_data = []
             for tile in row:
                 if tile.revealed:
-                    row_data.append(tile.bomb_count)
+                    row_data.append(tile.adjacent_bombs)
                 elif tile.flagged:
                     row_data.append("F")
                 else:

@@ -1,328 +1,341 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Minesweeper</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minesweeper</title>
 
-<style>
-body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background: #f4f6f8;
-    margin: 0;
-}
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background: #f4f6f8;
+        margin: 0;
+      }
 
-h1 { margin-top: 20px; }
+      h1 {
+        margin-top: 20px;
+      }
 
-#controls { margin: 15px 0; }
+      #controls {
+        margin: 15px 0;
+      }
 
-input {
-    width: 70px;
-    padding: 6px;
-    margin: 5px;
-    font-size: 14px;
-}
+      input {
+        width: 70px;
+        padding: 6px;
+        margin: 5px;
+        font-size: 14px;
+      }
 
-button {
-    padding: 8px 15px;
-    cursor: pointer;
-    font-size: 14px;
-}
+      button {
+        padding: 8px 15px;
+        cursor: pointer;
+        font-size: 14px;
+      }
 
-#board {
-    display: grid;
-    gap: 2px;
-    justify-content: center;
-    margin: 20px auto;
-    width: 90vw;
-    max-width: 600px;
-}
+      #board {
+        display: grid;
+        gap: 2px;
+        justify-content: center;
+        margin: 20px auto;
+        width: 90vw;
+        max-width: 600px;
+      }
 
-.cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    background: #bbb;
-    cursor: pointer;
-    user-select: none;
-    transition: 0.1s;
-}
+      .cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        background: #bbb;
+        cursor: pointer;
+        user-select: none;
+        transition: 0.1s;
+      }
 
-.cell:hover { background: #999; }
-.revealed { background: #eaeaea; cursor: default; }
-.flag { background: orange; }
+      .cell:hover {
+        background: #999;
+      }
+      .revealed {
+        background: #eaeaea;
+        cursor: default;
+      }
+      .flag {
+        background: orange;
+      }
 
-#status { height: 30px; }
+      #status {
+        height: 30px;
+      }
 
+      #overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
 
+      #popup {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        min-width: 250px;
+      }
 
-#overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-}
+      #popup h2 {
+        margin: 0;
+      }
 
-#popup {
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    text-align: center;
-    min-width: 250px;
-}
+      #popup button {
+        margin-top: 15px;
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+    </style>
+  </head>
 
-#popup h2 { margin: 0; }
+  <body>
+    <h1>💣 Minesweeper</h1>
 
-#popup button {
-    margin-top: 15px;
-    padding: 10px 20px;
-    font-size: 16px;
-}
-</style>
-</head>
+    <div id="controls">
+      Size:
+      <input type="number" id="size" value="8" min="2" />
+      Bombs:
+      <input type="number" id="bombs" value="10" min="1" />
+      <button onclick="newGame()">New Game</button>
+      <button onclick="toggleAI()" id="aiBtn">🤖 Start AI</button>
+      <span id="flags">Flags: 0</span>
+    </div>
 
-<body>
+    <div id="board"></div>
+    <h2 id="status"></h2>
 
-<h1>💣 Minesweeper</h1>
-
-<div id="controls">
-    Size:
-    <input type="number" id="size" value="8" min="2">
-    Bombs:
-    <input type="number" id="bombs" value="10" min="1">
-    <button onclick="newGame()">New Game</button>
-    <button onclick="toggleAI()" id="aiBtn">🤖 Start AI</button>
-    <span id="flags">Flags: 0</span>
-</div>
-
-<div id="board"></div>
-<h2 id="status"></h2>
-
-<div id="overlay">
-    <div id="popup">
+    <div id="overlay">
+      <div id="popup">
         <h2 id="popupMessage"></h2>
         <button onclick="restartGame()">Chơi lại</button>
+      </div>
     </div>
-</div>
 
-<script>
+    <script>
+      const API = 'http://127.0.0.1:3210';
+      let aiInterval = null;
 
-const API = "http://127.0.0.1:3210";
-let aiInterval = null;
+      async function newGame() {
+        stopAI();
 
-async function newGame() {
+        const size = parseInt(document.getElementById('size').value);
+        const bombs = parseInt(document.getElementById('bombs').value);
 
-    stopAI();
-
-    const size = parseInt(document.getElementById("size").value);
-    const bombs = parseInt(document.getElementById("bombs").value);
-
-    const res = await fetch(`${API}/new-game`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
+        const res = await fetch(`${API}/new-game`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             board_size: size,
-            bomb_count: bombs
-        })
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    document.getElementById("status").innerText = "";
-    document.getElementById("overlay").style.display = "none";
-    loadState();
-}
-
-async function loadState() {
-    const res = await fetch(`${API}/state`);
-    const data = await res.json();
-
-    document.getElementById("flags").innerText =
-        "Flags: " + data.flags_left;
-
-    renderBoard(data.board);
-}
-
-function renderBoard(board) {
-    const boardDiv = document.getElementById("board");
-    const size = board.length;
-    const maxWidth = boardDiv.clientWidth;
-    const cellSize = Math.floor(maxWidth * 0.8 / size);
-
-    // Nếu bảng đã được tạo đúng kích thước, thì chỉ cập nhật nội dung thay vì xóa toàn bộ
-    if (boardDiv.childElementCount === size * size) {
-        board.forEach((row, r) => {
-            row.forEach((cell, c) => {
-                const idx = r * size + c;
-                const div = boardDiv.children[idx];
-
-                // Reset trạng thái class và sự kiện
-                div.className = "cell";
-                div.innerText = "";
-                div.onclick = null;
-                div.oncontextmenu = null;
-
-                if (cell === null) {
-                    div.onclick = () => reveal(r, c);
-                    div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
-                } else if (cell === "F") {
-                    div.classList.add("flag");
-                    div.innerText = "🚩";
-                    // Cho phép click chuột phải để hủy cờ
-                    div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); }; 
-                } else {
-                    div.classList.add("revealed");
-                    if (cell !== 0) div.innerText = cell;
-                }
-            });
+            bomb_count: bombs,
+          }),
         });
-        return;
-    }
 
-    // Tạo bảng mới hoàn toàn (chỉ chạy khi load lần đầu hoặc đổi Size)
-    boardDiv.innerHTML = "";
-    boardDiv.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
+        const data = await res.json();
 
-    board.forEach((row, r) => {
-        row.forEach((cell, c) => {
-            const div = document.createElement("div");
-            div.classList.add("cell");
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
 
-            div.style.width = cellSize + "px";
-            div.style.height = cellSize + "px";
-            div.style.fontSize = (cellSize * 0.5) + "px";
+        document.getElementById('status').innerText = '';
+        document.getElementById('overlay').style.display = 'none';
+        loadState();
+      }
 
-            if (cell === null) {
+      async function loadState() {
+        const res = await fetch(`${API}/state`);
+        const data = await res.json();
+        console.log(data);
+
+        document.getElementById('flags').innerText =
+          'Flags: ' + data.flags_left;
+
+        renderBoard(data.board);
+      }
+
+      function renderBoard(board) {
+        const boardDiv = document.getElementById('board');
+        const size = board.length;
+        const maxWidth = boardDiv.clientWidth;
+        const cellSize = Math.floor((maxWidth * 0.8) / size);
+
+        // Nếu bảng đã được tạo đúng kích thước, thì chỉ cập nhật nội dung thay vì xóa toàn bộ
+        if (boardDiv.childElementCount === size * size) {
+          board.forEach((row, r) => {
+            row.forEach((cell, c) => {
+              const idx = r * size + c;
+              const div = boardDiv.children[idx];
+
+              // Reset trạng thái class và sự kiện
+              div.className = 'cell';
+              div.innerText = '';
+              div.onclick = null;
+              div.oncontextmenu = null;
+
+              if (cell === null) {
                 div.onclick = () => reveal(r, c);
-                div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
-            }
-            else if (cell === "F") {
-                div.classList.add("flag");
-                div.innerText = "🚩";
-                div.oncontextmenu = (e) => { e.preventDefault(); flag(r, c); };
-            }
-            else {
-                div.classList.add("revealed");
+                div.oncontextmenu = (e) => {
+                  e.preventDefault();
+                  flag(r, c);
+                };
+              } else if (cell === 'F') {
+                div.classList.add('flag');
+                div.innerText = '🚩';
+                // Cho phép click chuột phải để hủy cờ
+                div.oncontextmenu = (e) => {
+                  e.preventDefault();
+                  flag(r, c);
+                };
+              } else {
+                div.classList.add('revealed');
                 if (cell !== 0) div.innerText = cell;
+              }
+            });
+          });
+          return;
+        }
+
+        // Tạo bảng mới hoàn toàn (chỉ chạy khi load lần đầu hoặc đổi Size)
+        boardDiv.innerHTML = '';
+        boardDiv.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
+
+        board.forEach((row, r) => {
+          row.forEach((cell, c) => {
+            const div = document.createElement('div');
+            div.classList.add('cell');
+
+            div.style.width = cellSize + 'px';
+            div.style.height = cellSize + 'px';
+            div.style.fontSize = cellSize * 0.5 + 'px';
+
+            if (cell === null || cell === 'F') {
+              div.oncontextmenu = (e) => {
+                e.preventDefault();
+                flag(r, c); // dùng chung API, backend tự toggle
+              };
+
+              if (cell === null) {
+                div.onclick = () => reveal(r, c);
+              }
+
+              if (cell === 'F') {
+                div.classList.add('flag');
+                div.innerText = '🚩';
+              }
+            } else {
+              div.classList.add('revealed');
+              if (cell !== 0) div.innerText = cell;
             }
 
             boardDiv.appendChild(div);
+          });
         });
-    });
-}
+      }
 
-async function reveal(row, col) {
+      async function reveal(row, col) {
+        const res = await fetch(`${API}/reveal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ row, col }),
+        });
 
-    const res = await fetch(`${API}/reveal`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({row, col})
-    });
-
-    const data = await res.json();
-
-    if (data.result === "FOUND_BOMB") {
-        stopAI();
-        showPopup("💥 Game Over!");
-    }
-
-    if (data.result === "GAME_WON") {
-        stopAI();
-        showPopup("🎉 You Win!");
-    }
-
-    document.getElementById("flags").innerText =
-        "Flags: " + data.flags_left;
-
-    renderBoard(data.board);
-}
-
-async function flag(row, col) {
-
-    const res = await fetch(`${API}/flag`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({row, col})
-    });
-
-    const data = await res.json();
-
-    document.getElementById("flags").innerText =
-        "Flags: " + data.flags_left;
-
-    renderBoard(data.board);
-}
-
-
-function toggleAI() {
-    if (aiInterval) {
-        stopAI();
-    } else {
-        startAI();
-    }
-}
-
-function startAI() {
-    document.getElementById("aiBtn").innerText = "🛑 Stop AI";
-
-    aiInterval = setInterval(async () => {
-
-        const res = await fetch(`${API}/ai_move`);
         const data = await res.json();
 
-        if (data.action === "none") {
+        if (data.result === 'FOUND_BOMB') {
+          stopAI();
+          showPopup('💥 Game Over!');
+        }
+
+        if (data.result === 'GAME_WON') {
+          stopAI();
+          showPopup('🎉 You Win!');
+        }
+
+        document.getElementById('flags').innerText =
+          'Flags: ' + data.flags_left;
+
+        renderBoard(data.board);
+      }
+
+      async function flag(row, col) {
+        const res = await fetch(`${API}/flag`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ row, col }),
+        });
+
+        const data = await res.json();
+
+        document.getElementById('flags').innerText =
+          'Flags: ' + data.flags_left;
+
+        renderBoard(data.board);
+      }
+
+      function toggleAI() {
+        if (aiInterval) {
+          stopAI();
+        } else {
+          startAI();
+        }
+      }
+
+      function startAI() {
+        document.getElementById('aiBtn').innerText = '🛑 Stop AI';
+
+        aiInterval = setInterval(async () => {
+          const res = await fetch(`${API}/ai_move`);
+          const data = await res.json();
+
+          if (data.action === 'none') {
             stopAI();
             return;
-        }
+          }
 
-        if (data.action === "flag") {
+          if (data.action === 'flag') {
             await flag(data.row, data.col);
-        }
+          }
 
-        if (data.action === "reveal") {
+          if (data.action === 'reveal') {
             await reveal(data.row, data.col);
+          }
+        }, 50);
+      }
+
+      function stopAI() {
+        if (aiInterval) {
+          clearInterval(aiInterval);
+          aiInterval = null;
+          document.getElementById('aiBtn').innerText = '🤖 Start AI';
         }
+      }
 
-    }, 50);
-}
+      function showPopup(message) {
+        document.getElementById('popupMessage').innerText = message;
+        document.getElementById('overlay').style.display = 'flex';
+      }
 
-function stopAI() {
-    if (aiInterval) {
-        clearInterval(aiInterval);
-        aiInterval = null;
-        document.getElementById("aiBtn").innerText = "🤖 Start AI";
-    }
-}
+      function restartGame() {
+        document.getElementById('overlay').style.display = 'none';
+        newGame();
+      }
 
+      window.addEventListener('resize', loadState);
 
-
-function showPopup(message) {
-    document.getElementById("popupMessage").innerText = message;
-    document.getElementById("overlay").style.display = "flex";
-}
-
-function restartGame() {
-    document.getElementById("overlay").style.display = "none";
-    newGame();
-}
-
-window.addEventListener("resize", loadState);
-
-newGame();
-
-</script>
-
-</body>
+      newGame();
+    </script>
+  </body>
 </html>
