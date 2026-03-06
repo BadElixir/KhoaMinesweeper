@@ -3,6 +3,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from enum import Enum
 import random
+import subprocess
+import sys
 import uvicorn
 from AI import solve
 
@@ -285,13 +287,27 @@ def run_auto_test(num_games=100, size=16, bombs=40):
     print(f"Tỉ lệ thắng: {win_rate:.2f}%")
 
 
+def run_pytest_suite():
+    print("\n--- CHẠY TEST SUITE (pytest -q tests) ---")
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "tests"], check=False
+    )
+    if result.returncode == 0:
+        print("--- TEST SUITE: PASS ---")
+        return True
+
+    print("--- TEST SUITE: FAIL ---")
+    return False
+
+
 if __name__ == "__main__":
     mode = input("Chọn chế độ (1: Web, 2: Auto-Test): ")
     if mode == "1":
         threading.Timer(1.0, open_browser).start()
         uvicorn.run("main:app", host="127.0.0.1", port=3210, reload=True)
     else:
-        print("\n--- CHỌN CẤU HÌNH TEST ---")
+        run_pytest_suite()
+        print("\n--- CHỌN CẤU HÌNH THỐNG KÊ TỈ LỆ THẮNG ---")
         print("1. Small  (9x9, 10 bom)")
         print("2. Medium (16x16, 40 bom)")
         print("3. Large  (30x16, 99 bom)")
