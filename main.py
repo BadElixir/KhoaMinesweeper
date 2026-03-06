@@ -3,19 +3,18 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from enum import Enum
 import random
+import subprocess
+import sys
 import uvicorn
 from AI import solve
+
 app = FastAPI()
 import webbrowser
 import threading
 
 DELTA_PAIRS = [
-    (dy, dx)
-    for dy in (-1, 0, 1)
-    for dx in (-1, 0, 1)
-    if not (dy == 0 and dx == 0)
+    (dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if not (dy == 0 and dx == 0)
 ]
-
 
 
 class CustomNotif(str, Enum):
@@ -28,20 +27,19 @@ class CustomNotif(str, Enum):
     GAME_WON = "GAME_WON"
 
 
-
 class Move(BaseModel):
     row: int
     col: int
+
 
 class NewGameRequest(BaseModel):
     board_size: int
     bomb_count: int
 
 
-
 class BoardTile:
     def __init__(self):
-        self.bomb_count = 0
+        self.adjacent_bombs = 0
         self.revealed = False
         self.has_bomb = False
         self.flagged = False
@@ -53,8 +51,7 @@ class Game:
         self.bomb_count = bomb_count
 
         self.board = [
-            [BoardTile() for _ in range(board_size)]
-            for _ in range(board_size)
+            [BoardTile() for _ in range(board_size)] for _ in range(board_size)
         ]
 
         self.first_move = True
@@ -64,12 +61,8 @@ class Game:
         self.bombs_locations = []
         self.game_over = False
 
-
-
     def coords_valid(self, row, col):
         return 0 <= row < self.board_size and 0 <= col < self.board_size
-
- 
 
     def place_bombs(self, safe_row, safe_col):
         valid_cells = []
@@ -81,7 +74,7 @@ class Game:
                 valid_cells.append((r, c))
 
         random.shuffle(valid_cells)
-        bombs = valid_cells[:self.bomb_count]
+        bombs = valid_cells[: self.bomb_count]
 
         for r, c in bombs:
             self.board[r][c].has_bomb = True
@@ -93,8 +86,7 @@ class Game:
             for dy, dx in DELTA_PAIRS:
                 ny, nx = y_bomb + dy, x_bomb + dx
                 if self.coords_valid(ny, nx):
-                    self.board[ny][nx].bomb_count += 1
-
+                    self.board[ny][nx].adjacent_bombs += 1
 
     def reveal_safe_area(self, row, col):
         stack = [(row, col)]
@@ -109,7 +101,7 @@ class Game:
             tile.revealed = True
             self.revealed_tiles += 1
 
-            if tile.bomb_count > 0:
+            if tile.adjacent_bombs > 0:
                 continue
 
             for dy, dx in DELTA_PAIRS:
@@ -148,7 +140,6 @@ class Game:
 
         return CustomNotif.NO_BOMB
 
-
     def flag(self, row, col):
         if not self.coords_valid(row, col):
             return CustomNotif.INVALID_COORDINATES
@@ -170,7 +161,6 @@ class Game:
         self.available_flags -= 1
         return CustomNotif.TILE_FLAGGED
 
-
     def get_board_state(self):
         result = []
 
@@ -178,7 +168,7 @@ class Game:
             row_data = []
             for tile in row:
                 if tile.revealed:
-                    row_data.append(tile.bomb_count)
+                    row_data.append(tile.adjacent_bombs)
                 elif tile.flagged:
                     row_data.append("F")
                 else:
@@ -188,10 +178,7 @@ class Game:
         return result
 
 
-
-
 game = Game()
-
 
 
 @app.post("/new-game")
@@ -204,7 +191,7 @@ def new_game(request: NewGameRequest):
     if request.bomb_count <= 0:
         return {"error": "Bomb count must be > 0"}
 
-    if request.bomb_count >= request.board_size ** 2:
+    if request.bomb_count >= request.board_size**2:
         return {"error": "Too many bombs"}
 
     game = Game(request.board_size, request.bomb_count)
@@ -212,7 +199,7 @@ def new_game(request: NewGameRequest):
     return {
         "message": "Game created",
         "board_size": request.board_size,
-        "bomb_count": request.bomb_count
+        "bomb_count": request.bomb_count,
     }
 
 
@@ -222,7 +209,7 @@ def reveal(move: Move):
     return {
         "result": result,
         "board": game.get_board_state(),
-        "flags_left": game.available_flags
+        "flags_left": game.available_flags,
     }
 
 
@@ -232,16 +219,14 @@ def flag(move: Move):
     return {
         "result": result,
         "board": game.get_board_state(),
-        "flags_left": game.available_flags
+        "flags_left": game.available_flags,
     }
 
 
 @app.get("/state")
 def state():
-    return {
-        "board": game.get_board_state(),
-        "flags_left": game.available_flags
-    }
+    return {"board": game.get_board_state(), "flags_left": game.available_flags}
+
 
 @app.get("/ai_move")
 def ai_move():
@@ -253,11 +238,8 @@ def ai_move():
 
     action, row, col = solve(board, game.available_flags)
 
-    return {
-        "action": action,
-        "row": row,
-        "col": col
-    }
+    return {"action": action, "row": row, "col": col}
+
 
 @app.get("/")
 def serve_index():
@@ -266,9 +248,12 @@ def serve_index():
 
 def open_browser():
     webbrowser.open("http://127.0.0.1:3210/")
-    
+
+
 def run_auto_test(num_games=100, size=16, bombs=40):
-    print(f"--- BẮT ĐẦU TEST TỰ ĐỘNG: {num_games} trận, Map {size}x{size}, {bombs} bom ---")
+    print(
+        f"--- BẮT ĐẦU TEST TỰ ĐỘNG: {num_games} trận, Map {size}x{size}, {bombs} bom ---"
+    )
     wins = 0
     losses = 0
 
@@ -302,16 +287,30 @@ def run_auto_test(num_games=100, size=16, bombs=40):
     print(f"Tỉ lệ thắng: {win_rate:.2f}%")
 
 
+def run_pytest_suite():
+    print("\n--- CHẠY TEST SUITE (pytest -q tests) ---")
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "tests"], check=False
+    )
+    if result.returncode == 0:
+        print("--- TEST SUITE: PASS ---")
+        return True
+
+    print("--- TEST SUITE: FAIL ---")
+    return False
+
+
 if __name__ == "__main__":
     mode = input("Chọn chế độ (1: Web, 2: Auto-Test): ")
     if mode == "1":
         threading.Timer(1.0, open_browser).start()
         uvicorn.run("main:app", host="127.0.0.1", port=3210, reload=True)
     else:
-        print("\n--- CHỌN CẤU HÌNH TEST ---")
+        run_pytest_suite()
+        print("\n--- CHỌN CẤU HÌNH THỐNG KÊ TỈ LỆ THẮNG ---")
         print("1. Small  (9x9, 10 bom)")
         print("2. Medium (16x16, 40 bom)")
-        print("3. Large  (30x16, 99 bom)")
+        print("3. Large  (30x30, 99 bom)")
         print("4. Custom (Tùy chỉnh)")
 
         choice = input("Lựa chọn của bạn: ")
